@@ -15,11 +15,13 @@ rename / version-bump commits.
 
 Quick scan (run from repo root):
 
-⚠ Use `origin/main..HEAD`, **never `origin/HEAD..HEAD`**. `origin/HEAD` is unset
-in this clone, so `git diff origin/HEAD..HEAD` aborts with `bad revision`; the
-`grep` behind the pipe then reads an empty stream, matches nothing and prints
-`diff clean` — **without having checked anything**. Always print the diff size
-first so a scan that saw zero lines is visible.
+⚠ Use `origin/main..HEAD`, **never `origin/HEAD..HEAD`**. `origin/HEAD` went
+unset in this clone for a long time, and `git diff origin/HEAD..HEAD` then
+aborts with `bad revision`; the `grep` behind the pipe reads an empty stream,
+matches nothing and prints `diff clean` — **without having checked anything**.
+(It has since been pointed at `main` with `git remote set-head origin main`, but
+that is local state a fresh clone does not have to share, so the rule stands.)
+Always print the diff size first so a scan that saw zero lines is visible.
 
 ```bash
 git diff origin/main..HEAD -- '**' | wc -l   # 0 = nothing was scanned, investigate

@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import sys
@@ -143,23 +144,71 @@ def load_store(storage: Path, name: str) -> dict[str, Any]:
         return json.load(handle)
 
 
-def save_store(storage: Path, name: str, payload: dict[str, Any], stamp: str) -> Path:
-    """Back up, write, and read back one storage file.
+def _write_candidate(
+    storage: Path, name: str, payload: dict[str, Any], tmp: Path
+) -> Path:
+    """Write one registry beside its original and prove it parses.
 
-    The read-back is not ceremony. A truncated or non-JSON registry is the one
-    failure mode of this tool that a user cannot recover from without a backup,
-    so the tool proves the file it just wrote still parses before moving on.
+    Three details matter more than they look:
+
+    * The file is created with the **original's permissions**, through
+      ``os.open`` with the mode set at creation rather than a ``chmod``
+      afterwards. ``core.config_entries`` holds the credentials of every
+      integration the user has; a file that is briefly world-readable, or that
+      ends up ``0644`` because that is what the umask said, is a credential
+      leak this tool would have caused itself.
+    * It is written in Home Assistant's own shape — compact records, not
+      pretty-printed — so a 3 MB entity registry does not quadruple in size
+      just because a tool passed through it.
+    * It is read back before anything is renamed. A truncated registry is the
+      one failure here a user cannot undo without the backup.
     """
     path = storage / name
-    backup = storage / f"{name}.bak-{stamp}"
-    shutil.copy2(path, backup)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with tmp.open("w", encoding="utf-8") as handle:
-        json.dump(payload, handle, indent=2)
+    mode = path.stat().st_mode & 0o777
+    if tmp.exists():
+        tmp.unlink()
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, separators=(",", ":"))
     with tmp.open(encoding="utf-8") as handle:
         json.load(handle)
-    tmp.replace(path)
-    return backup
+    return tmp
+
+
+def save_stores(storage: Path, stores: dict[str, dict[str, Any]], stamp: str) -> list[Path]:
+    """Back up and replace every registry, or leave all of them alone.
+
+    The three registries only make sense together: an entity registry that
+    points at a device the device registry no longer has is worse than either
+    file being stale. So every replacement is written and validated **first**,
+    and only then are the originals swapped. An interruption before the swap
+    leaves the installation exactly as it was, minus some ``.tmp`` files.
+    """
+    backups = []
+    # Every temporary path is known before the first byte is written, so the
+    # cleanup below also removes the half-written one that raised. That file
+    # would otherwise sit in .storage holding a full copy of the credentials
+    # the registry contains.
+    candidates = {
+        name: (storage / name).with_suffix((storage / name).suffix + ".tmp")
+        for name in stores
+    }
+    try:
+        for name, payload in stores.items():
+            _write_candidate(storage, name, payload, candidates[name])
+    except BaseException:
+        for tmp in candidates.values():
+            tmp.unlink(missing_ok=True)
+        raise
+
+    for name in stores:
+        path = storage / name
+        backup = storage / f"{name}.bak-{stamp}"
+        shutil.copy2(path, backup)
+        backups.append(backup)
+    for name, tmp in candidates.items():
+        tmp.replace(storage / name)
+    return backups
 
 
 # ── Planning ─────────────────────────────────────────────────────────────────
@@ -303,6 +352,22 @@ def build_plan(
     }
 
 
+# Field names whose *value* must never reach the terminal. A config entry holds
+# whatever its integration put there, and this plan gets read aloud, screenshotted
+# and pasted into bug reports. The change is still applied — only the display is
+# withheld, because a reviewer needs to see *that* a field changes, not what to.
+_SECRET_FIELD = re.compile(
+    r"password|token|secret|api[_-]?key|auth|credential|cookie|session", re.IGNORECASE
+)
+
+
+def _shown(field: str, value: Any) -> str:
+    """Render one config-entry value, or a placeholder if the name smells."""
+    if _SECRET_FIELD.search(field):
+        return "<withheld>"
+    return str(value)
+
+
 def render_plan(plan: dict[str, Any]) -> str:
     """Render the plan as the text a human reads before saying yes."""
     old_dev = plan["old_device"]
@@ -326,7 +391,9 @@ def render_plan(plan: dict[str, Any]) -> str:
     for change in plan["entry_changes"]:
         lines.append(f"  Config entry {change['entry_id']}:")
         for field, (before, after) in change["fields"].items():
-            lines.append(f"      {field}: {before} -> {after}")
+            lines.append(
+                f"      {field}: {_shown(field, before)} -> {_shown(field, after)}"
+            )
     for entry_id in plan["remove_entry_ids"]:
         lines.append(f"  Remove config entry {entry_id} (the new hardware's own entry)")
     if plan.get("address_unknown"):
@@ -458,7 +525,7 @@ def main(argv: list[str] | None = None) -> int:
 
     apply_plan(stores, plan)
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    backups = [save_store(storage, name, payload, stamp) for name, payload in stores.items()]
+    backups = save_stores(storage, stores, stamp)
     print("\nApplied. Backups written:")
     for backup in backups:
         print(f"  {backup}")

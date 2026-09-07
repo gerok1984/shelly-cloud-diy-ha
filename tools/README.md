@@ -59,6 +59,30 @@ Useful flags:
 | `--domain` | The integration that owns the device. Defaults to `shelly` (the built-in one); pass `shelly_cloud_diy` to act on this integration's devices instead. |
 | `--new-host` | The replacement's address, when the integration stores one and Home Assistant has not discovered the new unit yet. Without it the entry keeps the old address, and the script says so rather than leaving you to find out. |
 
+### How it treats the files
+
+`core.config_entries` holds the credentials of every integration you have, so
+the writing is the part that got the most care:
+
+- **Permissions are preserved exactly.** The replacement is created with the
+  original's mode set at creation, not chmod'ed afterwards, so there is never a
+  moment where a credential file is readable by anyone who could not read it
+  before. (An earlier version of this script did not do that and silently
+  turned an `0600` registry into `0664`.)
+- **All three registries change together or not at all.** Each replacement is
+  written and re-read first; the originals are swapped only once every one of
+  them is known good. An interruption before that leaves your installation
+  exactly as it was.
+- **Backups first**, one per file, next to the original and with the same
+  permissions. They are not cleaned up — they contain credentials, so delete
+  them yourself once you are happy.
+- **Values that look like secrets are not printed.** The plan tells you *that* a
+  password-shaped field changes, never what to. The change is still applied.
+- Files are written in Home Assistant's own compact shape, so a 3 MB entity
+  registry does not balloon just because a tool passed through it.
+
+Run it as the same user Home Assistant runs as.
+
 ### What it refuses to do
 
 It refuses rather than half-doing, every time: an unparseable MAC, a MAC that

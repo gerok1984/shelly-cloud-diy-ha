@@ -370,3 +370,92 @@ def test_no_address_warning_for_an_integration_that_keeps_no_address():
 
     assert plan["address_unknown"] is False
     assert "--new-host" not in tool.render_plan(plan)
+
+
+# ── Writing safely ──────────────────────────────────────────────────────────
+
+
+def test_the_registry_keeps_its_permissions(tmp_path: Path):
+    """core.config_entries holds every integration's credentials.
+
+    Writing it back through a plain open() picks up the umask, which turned an
+    0600 file into 0664 — a credential leak caused by the repair tool itself.
+    """
+    config = _write_config(tmp_path)
+    storage = config / ".storage"
+    for name in (tool.CONFIG_ENTRIES, tool.DEVICE_REGISTRY, tool.ENTITY_REGISTRY):
+        (storage / name).chmod(0o600)
+
+    assert tool.main(
+        ["--config", str(config), "--old", OLD, "--new", NEW, "--apply", "--ha-is-stopped"]
+    ) == 0
+
+    for name in (tool.CONFIG_ENTRIES, tool.DEVICE_REGISTRY, tool.ENTITY_REGISTRY):
+        assert (storage / name).stat().st_mode & 0o777 == 0o600, name
+        assert not (storage / f"{name}.tmp").exists()
+
+
+def test_a_failure_part_way_through_leaves_every_registry_untouched(tmp_path: Path, monkeypatch):
+    """The three registries only make sense together.
+
+    An entity registry pointing at a device the device registry no longer has is
+    worse than all three being stale, so nothing is swapped until every
+    replacement has been written and re-read.
+    """
+    config = _write_config(tmp_path)
+    storage = config / ".storage"
+    before = {
+        name: (storage / name).read_text(encoding="utf-8")
+        for name in (tool.CONFIG_ENTRIES, tool.DEVICE_REGISTRY, tool.ENTITY_REGISTRY)
+    }
+
+    real_dump = json.dump
+    calls = {"n": 0}
+
+    def exploding_dump(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 3:
+            raise OSError("disk full")
+        return real_dump(*args, **kwargs)
+
+    monkeypatch.setattr(tool.json, "dump", exploding_dump)
+
+    with pytest.raises(OSError):
+        tool.main(
+            ["--config", str(config), "--old", OLD, "--new", NEW, "--apply", "--ha-is-stopped"]
+        )
+
+    for name, text in before.items():
+        assert (storage / name).read_text(encoding="utf-8") == text, name
+        assert not (storage / f"{name}.tmp").exists()
+        assert not list(storage.glob(f"{name}.bak-*"))
+
+
+def test_a_secret_looking_field_is_not_printed(capsys):
+    """The plan gets screenshotted and pasted into bug reports."""
+    stores = _stores()
+    for entry in stores[tool.CONFIG_ENTRIES]["data"]["entries"]:
+        if entry["entry_id"] == "entry_old":
+            entry["data"]["password"] = f"hunter2-{OLD.upper()}"
+
+    plan = tool.build_plan(stores, OLD, NEW, "shelly")
+    rendered = tool.render_plan(plan)
+
+    assert "hunter2" not in rendered
+    assert "<withheld>" in rendered
+    # ...but the change itself is still made.
+    tool.apply_plan(stores, plan)
+    entries = {e["entry_id"]: e for e in stores[tool.CONFIG_ENTRIES]["data"]["entries"]}
+    assert entries["entry_old"]["data"]["password"] == f"hunter2-{NEW.upper()}"
+
+
+def test_the_written_registry_is_not_pretty_printed(tmp_path: Path):
+    """Home Assistant stores records compactly; a 3 MB registry must not balloon."""
+    config = _write_config(tmp_path)
+    storage = config / ".storage"
+
+    tool.main(["--config", str(config), "--old", OLD, "--new", NEW, "--apply", "--ha-is-stopped"])
+
+    text = (storage / tool.ENTITY_REGISTRY).read_text(encoding="utf-8")
+    assert json.loads(text)
+    assert "\n" not in text
