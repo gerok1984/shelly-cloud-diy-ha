@@ -98,6 +98,10 @@ _VIRTUAL_COMPONENT_KEY_RE = re.compile(r"^(number|enum|text|boolean):\d+$")
 # a boolean can be set (``Boolean.Set``, the one write measured to work).
 _VIRTUAL_BOOLEAN_KEY_RE = re.compile(r"^boolean:(\d+)$")
 
+# Shelly BLU Gateway Gen3 exposes paired thermostatic valves as ``blutrv:<id>``.
+# Commands are sent to the gateway, not to the GBLE child device itself.
+_BLUTRV_KEY_RE = re.compile(r"^blutrv:(\d+)$")
+
 # ── Deep-sleep (battery) device freshness ─────────────────────────────
 #
 # Battery devices (H&T, Flood, Door/Window, …) are awake for a few seconds
@@ -1391,7 +1395,12 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             status = info.get("status") or {}
             if device_gen(status) == "GBLE" or not is_gen2_status(status):
                 continue
-            if any(_VIRTUAL_BOOLEAN_KEY_RE.match(key) for key in status):
+            # Virtual booleans and BLU TRV components both need the opt-in
+            # cloud relay. For BLU TRVs the relay target is this gateway.
+            if any(
+                _VIRTUAL_BOOLEAN_KEY_RE.match(key) or _BLUTRV_KEY_RE.match(key)
+                for key in status
+            ):
                 candidates.append(device_id)
         return sorted(candidates)
 
@@ -1591,6 +1600,46 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         # precisely what would hide a zone that accepted the command and did
         # not move; the poll is what can tell the difference.
         await self.async_request_refresh()
+
+
+    async def async_set_blutrv_target(
+        self, device_id: str, component_key: str, target_c: float
+    ) -> None:
+        """Set a BLU TRV target through its Shelly BLU Gateway Gen3."""
+        ws = self._cloud_ws
+        if ws is None:
+            raise HomeAssistantError(
+                "Cloud control is not connected for this Shelly account"
+            )
+        if not self.is_cloud_controllable(device_id):
+            raise HomeAssistantError(
+                f"Shelly Cloud will not route commands to gateway {device_id}"
+            )
+
+        match = _BLUTRV_KEY_RE.match(component_key)
+        if match is None:
+            raise HomeAssistantError(
+                f"{component_key} is not a Shelly BLU TRV component"
+            )
+
+        target = float(target_c)
+        if not 4.0 <= target <= 30.0:
+            raise HomeAssistantError(
+                "Shelly BLU TRV target must be between 4.0 and 30.0 °C"
+            )
+
+        await ws.send_jrpc_request(
+            device_id,
+            "BluTrv.Call",
+            {
+                "id": int(match.group(1)),
+                "method": "TRV.SetTarget",
+                "params": {"id": 0, "target_C": target},
+            },
+        )
+        # The normal Cloud poll remains authoritative for state confirmation.
+        await self.async_request_refresh()
+
 
     # ── Command dispatch (compat shim for platform files) ─────────────
 
