@@ -7,6 +7,14 @@
 
 > 🇩🇪 **Deutsch** · 🇬🇧 **English (you are here)** — [`README.de.md`](README.de.md) is the German mirror of this page.
 
+> **Fork addition — Shelly BLU TRV support:** this fork adds Home Assistant
+> `climate` entities for **Shelly BLU TRV** devices paired through a **Shelly
+> BLU Gateway Gen3**. It reads current/target temperature, valve position,
+> battery, RSSI and errors, and changes the target temperature through
+> `BluTrv.Call → TRV.SetTarget` over the existing opt-in cloud-control relay.
+> This path has been verified in a real Home Assistant installation with two
+> BLU TRVs.
+
 **Shelly Cloud DIY** connects Home Assistant to your Shelly fleet through the
 self-service **Cloud Control API** — reaching the devices a local-only
 integration can never see (shared devices, remote sites, the Shelly BLU family
