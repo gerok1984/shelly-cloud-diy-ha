@@ -172,8 +172,8 @@ NATIVE_SHELLY_DOMAIN = "shelly"
 # from a sensor-only one (e.g. a shared WS90 weather station). ``climate``
 # is control too, but the cloud path never exposes it, so it is only
 # considered on the native side.
-CONTROL_DOMAINS = frozenset({"switch", "light", "cover"})
-NATIVE_CONTROL_DOMAINS = CONTROL_DOMAINS | frozenset({"climate"})
+CONTROL_DOMAINS = frozenset({"switch", "light", "cover", "climate"})
+NATIVE_CONTROL_DOMAINS = CONTROL_DOMAINS
 
 # ── "No longer in account" detector (detect_orphans) ───────────────
 #
@@ -195,6 +195,7 @@ CONF_KNOWN_DEVICES = "known_devices"
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
+    Platform.CLIMATE,
     Platform.COVER,
     Platform.LIGHT,
     Platform.SENSOR,
@@ -228,7 +229,7 @@ PLATFORMS: list[Platform] = [
 # They must not be re-added with an optional index either — a Gen1 status has
 # a bare ``cloud`` key too, which would classify every Gen1 device as Gen2.
 _GEN2_PATTERN = re.compile(
-    r"(switch|light|cover|input|temperature|humidity|flood"
+    r"(switch|light|cover|input|temperature|humidity|flood|blutrv"
     r"|devicepower|voltmeter|em1data|em1|emdata|em|pm1"
     r"|boolean|number|enum|text|button):\d+"
 )
