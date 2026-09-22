@@ -16,7 +16,7 @@ from .const import DOMAIN, SIGNAL_DEVICE_REMOVED
 from .coordinator import ShellyCloudCoordinator, SIGNAL_NEW_DEVICE
 from .entities.base import ShellyBaseEntity
 
-_BLUTRV_KEY_RE = re.compile(r"^blutrv:(\\d+)$")
+_BLUTRV_KEY_RE = re.compile(r"^blutrv:(\d+)$")
 
 
 async def async_setup_entry(
