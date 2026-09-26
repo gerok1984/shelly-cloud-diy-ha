@@ -1,0 +1,167 @@
+{
+  "source": "Sanitised extract from Shelly Cloud DIY diagnostics",
+  "home_assistant_version": "2026.9.3",
+  "integration_version": "0.12.0",
+  "gateway_model": "S3GW-1DBT001",
+  "coverage": {
+    "generation": "G2",
+    "uncovered_relevant_keys": [
+      "blutrv:200",
+      "blutrv:201",
+      "blutrv_rinfo:200",
+      "blutrv_rinfo:201",
+      "blutrv_rstatus:200",
+      "blutrv_rstatus:201"
+    ]
+  },
+  "vcomps": [
+    "blutrv:200",
+    "blutrv:201"
+  ],
+  "measurements": [
+    {
+      "value": "blutrv_rstatus:200",
+      "type": "trv"
+    },
+    {
+      "value": "blutrv_rstatus:201",
+      "type": "trv"
+    }
+  ],
+  "components": {
+    "blutrv:200": {
+      "last_updated_ts": 1790455431,
+      "packet_id": 101,
+      "rssi": -59,
+      "id": 200,
+      "target_C": 10,
+      "current_C": 24.3,
+      "pos": 0,
+      "connected": true,
+      "battery": 100,
+      "key": false,
+      "paired": true,
+      "rpc": true,
+      "rsv": 39,
+      "fw_ver": "v1.5.0",
+      "_attrs": {
+        "model_id": 8
+      }
+    },
+    "blutrv:201": {
+      "last_updated_ts": 1790455437,
+      "packet_id": 1,
+      "rssi": -61,
+      "id": 201,
+      "target_C": 10,
+      "current_C": 24.4,
+      "pos": 0,
+      "connected": true,
+      "battery": 100,
+      "key": false,
+      "paired": true,
+      "rpc": true,
+      "rsv": 12,
+      "fw_ver": "v1.5.0",
+      "_attrs": {
+        "model_id": 8
+      }
+    }
+  },
+  "remote_status": {
+    "blutrv_rstatus:200": {
+      "v": 39,
+      "ts": 1790381728,
+      "status": {
+        "sys": {
+          "time": "02:14",
+          "unixtime": 1790381698,
+          "offset": 7200,
+          "uptime": 307017,
+          "ram_size": 32768,
+          "ram_free": 7984,
+          "largest_block": 7760,
+          "cfg_rev": 12,
+          "state_rev": 39
+        },
+        "temperature:0": {
+          "id": 0,
+          "tC": 22.11,
+          "tF": 71.8,
+          "errors": [
+            "disabled"
+          ]
+        },
+        "trv:0": {
+          "id": 0,
+          "pos": 0,
+          "steps": 248126,
+          "current_C": 24.3,
+          "target_C": 10,
+          "schedule_rev": 0,
+          "errors": []
+        }
+      }
+    },
+    "blutrv_rstatus:201": {
+      "v": 12,
+      "ts": 1790315158,
+      "status": {
+        "sys": {
+          "time": "07:45",
+          "unixtime": 1790315132,
+          "offset": 7200,
+          "uptime": 233409,
+          "ram_size": 32768,
+          "ram_free": 7984,
+          "largest_block": 7760,
+          "cfg_rev": 14,
+          "state_rev": 12
+        },
+        "temperature:0": {
+          "id": 0,
+          "tC": 22,
+          "tF": 71.6,
+          "errors": [
+            "disabled"
+          ]
+        },
+        "trv:0": {
+          "id": 0,
+          "pos": 0,
+          "steps": 213000,
+          "current_C": 24.4,
+          "target_C": 10,
+          "schedule_rev": 0,
+          "errors": []
+        }
+      }
+    }
+  },
+  "remote_info": {
+    "blutrv_rinfo:200": {
+      "v": 39,
+      "device_info": {
+        "fw_id": "20260728-102342/v1.5.0@aa8644cc",
+        "bl_ver": 5,
+        "app": "BluTRV",
+        "model": "BluTRV",
+        "batch": "1",
+        "ver": "1.5.0",
+        "hw_id": "0"
+      }
+    },
+    "blutrv_rinfo:201": {
+      "v": 12,
+      "device_info": {
+        "fw_id": "20260728-102342/v1.5.0@aa8644cc",
+        "bl_ver": 5,
+        "app": "BluTRV",
+        "model": "BluTRV",
+        "batch": "1",
+        "ver": "1.5.0",
+        "hw_id": "0"
+      }
+    }
+  }
+}
