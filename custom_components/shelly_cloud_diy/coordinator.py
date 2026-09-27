@@ -91,7 +91,7 @@ _V2_NAME_LOOKUP_GAP_S = 1.2
 # Status/config keys of Gen2/Gen3 virtual components (``number:200``, …). Used
 # to decide which online devices need a one-time v2 config fetch so their
 # read-only virtual entities can render real names/units/options. (#9)
-_VIRTUAL_COMPONENT_KEY_RE = re.compile(r"^(number|enum|text|boolean):\d+$")
+_VIRTUAL_COMPONENT_KEY_RE = re.compile(r"^(number|enum|text|boolean|blutrv):\d+$")
 
 # The only component this integration can WRITE over the cloud relay. Kept
 # separate from the read-only set above: everything there is rendered, only
