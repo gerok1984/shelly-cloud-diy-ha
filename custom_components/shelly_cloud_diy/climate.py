@@ -17,6 +17,53 @@ from .coordinator import ShellyCloudCoordinator, SIGNAL_NEW_DEVICE
 from .entities.base import ShellyBaseEntity
 
 _BLUTRV_KEY_RE = re.compile(r"^blutrv:(\d+)$")
+_TRAILING_MAC_RE = re.compile(r"([0-9a-f]{12})$", re.IGNORECASE)
+
+
+def _normalised_device_suffix(value: str) -> str | None:
+    """Return a normalised 12-hex device suffix when one is present."""
+    compact = value.strip().lower().replace(":", "").replace("-", "")
+    match = _TRAILING_MAC_RE.search(compact)
+    return match.group(1) if match else None
+
+
+def _blu_trv_account_alias(
+    status: dict[str, Any],
+    component_key: str,
+    aliases: dict[str, str],
+) -> str | None:
+    """Resolve a BLU TRV alias from the account-wide Shelly device list.
+
+    BLU TRVs are not top-level coordinator devices, but the Shelly account
+    alias listing includes BLE children. The gateway status exposes the
+    child identity under blutrv_rinfo:<id>.device_info.id, so matching the
+    trailing MAC-sized identifier lets us recover the Shelly-app alias.
+    """
+    match = _BLUTRV_KEY_RE.match(component_key)
+    if match is None or not isinstance(aliases, dict):
+        return None
+
+    remote = status.get(f"blutrv_rinfo:{match.group(1)}")
+    if not isinstance(remote, dict):
+        return None
+    device_info = remote.get("device_info")
+    if not isinstance(device_info, dict):
+        return None
+    child_id = device_info.get("id")
+    if not isinstance(child_id, str):
+        return None
+    wanted = _normalised_device_suffix(child_id)
+    if wanted is None:
+        return None
+
+    for device_id, name in aliases.items():
+        if not isinstance(device_id, str) or not isinstance(name, str):
+            continue
+        if _normalised_device_suffix(device_id) != wanted:
+            continue
+        if name.strip():
+            return name.strip()
+    return None
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -112,10 +159,17 @@ class ShellyBluTrvClimate(ShellyBaseEntity, ClimateEntity):
 
     @property
     def name(self) -> str:
-        """Return the configured component name, or a stable fallback."""
+        """Return the Shelly-app valve name, or a stable fallback."""
         configured = self.virtual_component_name(self._component_key)
         if configured:
             return configured
+
+        aliases = getattr(self.coordinator, "account_device_names", {})
+        if account_alias := _blu_trv_account_alias(
+            self.device_status, self._component_key, aliases
+        ):
+            return account_alias
+
         return "BLU TRV" if self._display_index == 1 else f"BLU TRV {self._display_index}"
 
     def _component(self) -> dict[str, Any]:
