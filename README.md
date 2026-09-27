@@ -114,7 +114,8 @@ cannot see — and the two run side by side.
 | 📡 **Offline detection** | A per-device **Reporting** sensor that turns off when a device stops checking in — the signal `cloud.connected` cannot give you (see below). | ✅ shipped |
 | ⚡ **Stuck-contact warning** | Warns when a relay reports itself as open while the device's own meter still sees a load — a welded contact (see below). | ✅ shipped |
 | 🩺 **Health checks** | Warns when a device runs hot, its Wi-Fi signal is weak, or it is short of memory or storage — from data the poll already returns, at no extra request (see below). | ✅ shipped |
-| 🎛️ **Cloud control** | Switches for virtual components — an irrigation controller's zones, a script's boolean — that the documented API cannot write at all. Off by default, rides an **unsupported** channel, and works only on devices your account owns (see below). | 🧪 opt-in |
+| 🎛️ **Cloud control** | Writes the documented API cannot do at all: switching virtual components (an irrigation controller's zones, a script's boolean) and setting a BLU TRV's target temperature. Off by default, rides an **unsupported** channel, and works only on devices your account owns (see below). | 🧪 opt-in |
+| 🌡️ **BLU TRV valves** | Thermostatic valves behind a BLU Gateway Gen3 become climate entities — room temperature, setpoint, valve position, battery. Changing the setpoint needs cloud control (see below). | ✅ shipped |
 | 📶 **BLU gateway signal** | The signal the bridging gateway reports for a Bluetooth device — the only signal figure a BLU sensor has, with the gateway's id as an attribute. | ✅ shipped |
 | 🆙 **Firmware update flag** | Tells you a Gen2+ device has an update waiting, with the offered version. A flag, not an installer. | ✅ shipped |
 | 📈 **Energy history import** | Imports historical energy data into Home Assistant long-term statistics. | ✅ shipped |
@@ -530,9 +531,10 @@ try it, but don't depend on it yet.
 
 ### 🎛️ Cloud control *(opt-in, unsupported — see above)*
 
-OAuth sign-in plus the cloud WebSocket relay, used for **commands only**:
-switching the virtual components the documented API cannot write, on devices
-your account owns.
+OAuth sign-in plus the cloud WebSocket relay, used for **commands only**, on
+devices your account owns: switching the virtual components the documented API
+cannot write, and setting the target temperature of a Shelly BLU TRV behind a
+BLU Gateway Gen3.
 
 ### 🔭 Push instead of polling *(not planned as a replacement)*
 

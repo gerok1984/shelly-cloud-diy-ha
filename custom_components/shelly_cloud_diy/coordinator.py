@@ -42,6 +42,9 @@ from .api.cloud_ws import (
     ShellyCloudWsAuthError,
 )
 from .const import (
+    BLUTRV_KEY_RE,
+    BLUTRV_MAX_TEMP_C,
+    BLUTRV_MIN_TEMP_C,
     CLOUD_CONTROL_DEFAULT,
     CONF_CLOUD_CONTROL,
     CONF_CREATE_ALL_INITIALLY,
@@ -1391,7 +1394,14 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             status = info.get("status") or {}
             if device_gen(status) == "GBLE" or not is_gen2_status(status):
                 continue
-            if any(_VIRTUAL_BOOLEAN_KEY_RE.match(key) for key in status):
+            # Virtual booleans and BLU TRVs both need the opt-in relay, and
+            # for both the relay target is this device: for a valve that is
+            # the gateway, never the valve's own BLE address, which the
+            # relay refuses with ``WRONG_ID``. (#48)
+            if any(
+                _VIRTUAL_BOOLEAN_KEY_RE.match(key) or BLUTRV_KEY_RE.match(key)
+                for key in status
+            ):
                 candidates.append(device_id)
         return sorted(candidates)
 
@@ -1590,6 +1600,59 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         # Ask for the state instead of asserting it. An optimistic write is
         # precisely what would hide a zone that accepted the command and did
         # not move; the poll is what can tell the difference.
+        await self.async_request_refresh()
+
+    async def async_set_blutrv_target(
+        self, device_id: str, component_key: str, target_c: float
+    ) -> None:
+        """Set a BLU TRV target temperature through its BLU Gateway Gen3.
+
+        Two things about this path are worth stating rather than inferring,
+        because both were measured on real hardware and neither is
+        documented:
+
+        * The call goes to **the gateway**. A BLU TRV is a BLE device with no
+          cloud identity of its own; addressing it directly gets the relay's
+          ``WRONG_ID``, the same refusal a device you do not own produces.
+        * The valve is named by its component id, and the inner ``id`` is the
+          ``trv:0`` component *on the valve* — two different ids in one call.
+
+        Loud on every failure and never optimistic, for the same reason as
+        :meth:`async_set_virtual_boolean`: a swallowed error on a heating
+        valve looks exactly like a room that simply has not warmed up yet.
+        """
+        ws = self._cloud_ws
+        if ws is None:
+            raise HomeAssistantError(
+                "Cloud control is not connected for this Shelly account"
+            )
+        if not self.is_cloud_controllable(device_id):
+            raise HomeAssistantError(
+                f"Shelly Cloud will not route commands to gateway {device_id}"
+            )
+        match = BLUTRV_KEY_RE.match(component_key)
+        if match is None:
+            raise HomeAssistantError(
+                f"{component_key} is not a Shelly BLU TRV component"
+            )
+
+        target = float(target_c)
+        if not BLUTRV_MIN_TEMP_C <= target <= BLUTRV_MAX_TEMP_C:
+            raise HomeAssistantError(
+                f"A Shelly BLU TRV target must be between {BLUTRV_MIN_TEMP_C} "
+                f"and {BLUTRV_MAX_TEMP_C} °C, not {target}"
+            )
+
+        await ws.send_jrpc_request(
+            device_id,
+            "BluTrv.Call",
+            {
+                "id": int(match.group(1)),
+                "method": "TRV.SetTarget",
+                "params": {"id": 0, "target_C": target},
+            },
+        )
+        # As above: ask the poll what happened instead of asserting it.
         await self.async_request_refresh()
 
     # ── Command dispatch (compat shim for platform files) ─────────────

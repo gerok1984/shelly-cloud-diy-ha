@@ -9,6 +9,32 @@ full reasoning and the reporters' credits:
 the history is readable from a checkout alone, including on the Gitea mirror,
 which has no release pages.
 
+## v0.13.0 — 2026-09-27
+
+- **New: Shelly BLU TRV thermostatic valves.** A BLU Gateway Gen3 carries each
+  paired valve as `blutrv:<id>`, and none of it produced an entity: no
+  temperature, no setpoint, no battery. Every valve now gets a climate entity
+  with the room temperature, the valve's own setpoint and whether it is
+  currently open, plus battery and signal sensors of its own. A gateway whose
+  only RPC components are valves is also recognised as Gen2 now — the same
+  second half the smoke detector had in v0.12.1 (#48).
+- **Setting the target temperature works, over the opt-in cloud relay.** The
+  documented API cannot write it. The relay can, but only if the call is
+  addressed to *the gateway* and wraps the valve's own RPC — `BluTrv.Call`
+  carrying `TRV.SetTarget`. Sent to the valve's own id it is refused with
+  `WRONG_ID`, indistinguishable from a device you do not own. With cloud
+  control off the entity is still there and still reads; it just has no
+  setpoint to drag.
+- Both shapes come from a real sanitised cloud snapshot of a gateway with two
+  valves, contributed by [@gerok1984](https://github.com/gerok1984), who also
+  verified the write path against that hardware and published a working
+  implementation first. This one is written against the same evidence (#48).
+- Still uncovered on such a gateway, and deliberately so: `blutrv_rstatus:<id>`
+  and `blutrv_rinfo:<id>`. They mirror the valve's own status and firmware
+  info, and every reading in them that is worth an entity is already read from
+  `blutrv:<id>` itself. The valve-error list in there has only ever been seen
+  empty, so nothing is built from a field whose contents are unknown.
+
 ## v0.12.1 — 2026-09-20
 
 - **Fix: a Gen2+ smoke detector now creates its alarm entity.** A Shelly Plus

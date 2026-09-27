@@ -120,7 +120,8 @@ die Shellys, die sie nicht sieht — und beide laufen nebeneinander.
 | 📡 **Ausfall-Erkennung** | Ein **Reporting**-Sensor je Gerät, der abfällt, sobald sich ein Gerät nicht mehr meldet — das Signal, das `cloud.connected` nicht liefern kann (siehe unten). | ✅ ausgeliefert |
 | ⚡ **Warnung bei klebendem Kontakt** | Meldet, wenn ein Relais sich als offen meldet, während die geräteeigene Messung weiter eine Last sieht — ein verschweißter Kontakt (siehe unten). | ✅ ausgeliefert |
 | 🩺 **Gesundheitsprüfung** | Meldet, wenn ein Gerät heiß läuft, sein WLAN-Signal schwach ist oder ihm Speicher ausgeht — aus Daten, die der Abruf ohnehin liefert, ohne eine einzige zusätzliche Anfrage (siehe unten). | ✅ ausgeliefert |
-| 🎛️ **Cloud-Steuerung** | Schalter für virtuelle Komponenten — die Zonen eines Bewässerungscomputers, der Boolean eines Skripts —, die die dokumentierte API überhaupt nicht schreiben kann. Standardmäßig aus, läuft über einen **nicht unterstützten** Kanal und funktioniert nur auf Geräten, die deinem Konto gehören (siehe unten). | 🧪 Opt-in |
+| 🎛️ **Cloud-Steuerung** | Schreibzugriffe, die die dokumentierte API überhaupt nicht kann: virtuelle Komponenten schalten (die Zonen eines Bewässerungscomputers, der Boolean eines Skripts) und den Sollwert eines BLU TRV setzen. Standardmäßig aus, läuft über einen **nicht unterstützten** Kanal und funktioniert nur auf Geräten, die deinem Konto gehören (siehe unten). | 🧪 Opt-in |
+| 🌡️ **BLU-TRV-Ventile** | Heizkörperthermostate hinter einem BLU Gateway Gen3 werden zu Climate-Entitäten — Raumtemperatur, Sollwert, Ventilstellung, Batterie. Den Sollwert zu ändern braucht die Cloud-Steuerung (siehe unten). | ✅ ausgeliefert |
 | 📶 **BLU-Gateway-Signal** | Das Signal, das das brückende Gateway für ein Bluetooth-Gerät meldet — die einzige Signalzahl, die ein BLU-Sensor hat, mit der Gateway-ID als Attribut. | ✅ ausgeliefert |
 | 🆙 **Firmware-Update-Kennzeichen** | Zeigt, dass für ein Gen2+-Gerät ein Update bereitliegt, mit der angebotenen Version. Ein Hinweis, kein Installer. | ✅ ausgeliefert |
 | 📈 **Energie-Verlaufsimport** | Importiert historische Energiedaten in die Home-Assistant-Langzeitstatistik. | ✅ ausgeliefert |
@@ -559,9 +560,10 @@ Noch nicht fertig — gern ausprobieren, aber noch nicht darauf verlassen.
 
 ### 🎛️ Cloud-Steuerung *(Opt-in, nicht unterstützt — siehe oben)*
 
-OAuth-Anmeldung plus das Cloud-WebSocket-Relay, ausschließlich für **Befehle**:
-Schalten der virtuellen Komponenten, die die dokumentierte API nicht schreiben
-kann — auf Geräten, die deinem Konto gehören.
+OAuth-Anmeldung plus das Cloud-WebSocket-Relay, ausschließlich für **Befehle**
+und nur auf Geräten, die deinem Konto gehören: Schalten der virtuellen
+Komponenten, die die dokumentierte API nicht schreiben kann, und Setzen der
+Solltemperatur eines Shelly BLU TRV hinter einem BLU Gateway Gen3.
 
 ### 🔭 Push statt Polling *(nicht als Ersatz geplant)*
 

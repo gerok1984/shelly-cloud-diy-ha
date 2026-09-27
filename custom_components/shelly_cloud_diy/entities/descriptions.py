@@ -473,6 +473,31 @@ RPC_SENSORS: Final[dict[str, RpcSensorDescription]] = {
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # ------------------------------------------------------------------
+    # Shelly BLU TRV, seen through a BLU Gateway Gen3 (``blutrv:<id>``).
+    # The valve is a BLE device with no cloud presence of its own; the
+    # gateway carries its whole state flat in the component, so battery and
+    # signal are read straight off it rather than from the ``devicepower``
+    # and ``wifi`` blocks, which belong to the gateway. (#48)
+    # ------------------------------------------------------------------
+    "blutrv_battery": RpcSensorDescription(
+        key="blutrv",
+        sub_key="battery",
+        name="Battery",
+        native_unit_of_measurement=PERCENTAGE,
+        device_class=SensorDeviceClass.BATTERY,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "blutrv_rssi": RpcSensorDescription(
+        key="blutrv",
+        sub_key="rssi",
+        name="Signal Strength",
+        native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # ------------------------------------------------------------------
     # Energy Meter — 3-phase measurement (Shelly Pro 3EM ``em:<id>``).
     # Every phase shares component index 0, so each measurement needs its
     # own description with a distinct name to disambiguate the entities.

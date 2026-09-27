@@ -169,11 +169,14 @@ NATIVE_SHELLY_DOMAIN = "shelly"
 
 # Entity domains that constitute *control* (as opposed to read-only
 # sensing). Used by the resilience check to tell a controllable device
-# from a sensor-only one (e.g. a shared WS90 weather station). ``climate``
-# is control too, but the cloud path never exposes it, so it is only
-# considered on the native side.
-CONTROL_DOMAINS = frozenset({"switch", "light", "cover"})
-NATIVE_CONTROL_DOMAINS = CONTROL_DOMAINS | frozenset({"climate"})
+# from a sensor-only one (e.g. a shared WS90 weather station).
+#
+# ``climate`` was for a long time native-only, because the cloud path had no
+# way to reach a thermostat. The BLU TRV support added in #48 changed that:
+# a valve behind a BLU Gateway Gen3 is set over the cloud relay, so a climate
+# entity of ours is real control and must count as such on both sides.
+CONTROL_DOMAINS = frozenset({"switch", "light", "cover", "climate"})
+NATIVE_CONTROL_DOMAINS = CONTROL_DOMAINS
 
 # ── "No longer in account" detector (detect_orphans) ───────────────
 #
@@ -195,6 +198,7 @@ CONF_KNOWN_DEVICES = "known_devices"
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
+    Platform.CLIMATE,
     Platform.COVER,
     Platform.LIGHT,
     Platform.SENSOR,
@@ -227,11 +231,30 @@ PLATFORMS: list[Platform] = [
 # no ``:<id>`` suffix, so those alternatives could never match and are gone.
 # They must not be re-added with an optional index either — a Gen1 status has
 # a bare ``cloud`` key too, which would classify every Gen1 device as Gen2.
+#
+# ``blutrv`` is the same case as ``smoke`` in #47: a Shelly BLU Gateway Gen3
+# has no relay, no light and no meter — its only RPC components are the
+# valves it carries, so without this alternative the whole gateway would be
+# handed to the Gen1 builders. It matches ``blutrv:200`` and deliberately not
+# ``blutrv_rstatus:200`` / ``blutrv_rinfo:200``, which are per-valve mirrors
+# of the child's own status and info rather than components of the gateway.
 _GEN2_PATTERN = re.compile(
-    r"(switch|light|cover|input|temperature|humidity|flood|smoke"
+    r"(switch|light|cover|input|temperature|humidity|flood|smoke|blutrv"
     r"|devicepower|voltmeter|em1data|em1|emdata|em|pm1"
     r"|boolean|number|enum|text|button):\d+"
 )
+
+# Shelly BLU TRV, carried by a BLU Gateway Gen3 as ``blutrv:<id>`` in the
+# same 200+ range the virtual components use. Shared by the coordinator (the
+# write path), the sensor platform (battery / signal) and the climate
+# platform, so it lives here rather than being spelled three times.
+BLUTRV_KEY_RE = re.compile(r"^blutrv:(\d+)$")
+
+# The valve's own setpoint range. Shelly's BLU TRV accepts 4–30 °C and
+# answers anything outside it with an RPC error, so the write path stops
+# there rather than spending a relay round trip to be told no.
+BLUTRV_MIN_TEMP_C = 4.0
+BLUTRV_MAX_TEMP_C = 30.0
 
 
 def is_gen2_status(status: dict[str, Any]) -> bool:

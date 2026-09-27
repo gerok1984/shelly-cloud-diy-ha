@@ -19,7 +19,13 @@ from homeassistant.const import (
 )
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 
-from .const import DOMAIN, SIGNAL_DEVICE_REMOVED, device_gen, is_gen2_status
+from .const import (
+    BLUTRV_KEY_RE,
+    DOMAIN,
+    SIGNAL_DEVICE_REMOVED,
+    device_gen,
+    is_gen2_status,
+)
 from .coordinator import ShellyCloudCoordinator, SIGNAL_NEW_DEVICE
 from .entities.base import ShellyBaseEntity
 from .entities.descriptions import (
@@ -297,6 +303,39 @@ def _create_rpc_sensors(
                         entities.append(RpcSensor(
                             coordinator, device_id, desc, idx, key, "battery"
                         ))
+
+    # Shelly BLU TRV — the valve's own battery and radio link, read off the
+    # gateway component that carries it. Both are flat integers here, unlike
+    # the nested ``devicepower`` shape above, so they need their own
+    # descriptions rather than a reuse of ``battery``/``rssi``. The component
+    # index doubles as the display index, so the first valve's sensors carry
+    # no suffix and later ones do. (#48)
+    for display_index, key in enumerate(
+        sorted(
+            (k for k in status if BLUTRV_KEY_RE.match(k)),
+            key=lambda k: int(k.split(":", 1)[1]),
+        )
+    ):
+        data = status[key]
+        if not isinstance(data, dict):
+            continue
+        for field, desc_key in (("battery", "blutrv_battery"), ("rssi", "blutrv_rssi")):
+            value = data.get(field)
+            # ``bool`` is an ``int`` in Python, so a payload carrying
+            # ``rssi: true`` would otherwise render as a signal of 1 dBm —
+            # the same trap ``_usable_rssi`` exists for on the BLE path.
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                continue
+            desc = RPC_SENSORS.get(desc_key)
+            if not desc:
+                continue
+            uid = f"{device_id}_{key}_{field}"
+            if uid in created:
+                continue
+            created.add(uid)
+            entities.append(RpcSensor(
+                coordinator, device_id, desc, display_index, key, field
+            ))
 
     # Voltmeter — analog voltage input (e.g. Shelly Plus Uni, Plus Add-on).
     # The component id is in the add-on range (100+) but each device has a
