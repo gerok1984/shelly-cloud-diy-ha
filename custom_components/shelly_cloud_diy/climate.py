@@ -18,41 +18,6 @@ from .entities.base import ShellyBaseEntity
 
 _BLUTRV_KEY_RE = re.compile(r"^blutrv:(\d+)$")
 
-def _measurement_name(status: dict[str, Any], component_key: str) -> str | None:
-    """Resolve a BLU TRV name from the gateway measurement list.
-
-    Real Shelly Cloud diagnostics from a BLU Gateway Gen3 show that the
-    user-assigned valve names are carried in the _measurements list rather
-    than inside blutrv:<id> itself. Each TRV measurement points at
-    blutrv_rstatus:<id>, so the shared numeric suffix links it back to the
-    live blutrv:<id> component.
-
-    The direct component key is accepted as well in case Shelly changes
-    the measurement reference without changing the semantic relation.
-    """
-    match = _BLUTRV_KEY_RE.match(component_key)
-    if match is None:
-        return None
-
-    component_id = match.group(1)
-    accepted_values = {component_key, f"blutrv_rstatus:{component_id}"}
-    measurements = status.get("_measurements")
-    if not isinstance(measurements, list):
-        return None
-
-    for measurement in measurements:
-        if not isinstance(measurement, dict):
-            continue
-        if measurement.get("type") != "trv":
-            continue
-        if measurement.get("value") not in accepted_values:
-            continue
-        name = measurement.get("name")
-        if isinstance(name, str) and name.strip():
-            return name.strip()
-    return None
-
-
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -147,14 +112,10 @@ class ShellyBluTrvClimate(ShellyBaseEntity, ClimateEntity):
 
     @property
     def name(self) -> str:
-        """Return the Shelly-app valve name, or a stable fallback."""
+        """Return the configured component name, or a stable fallback."""
         configured = self.virtual_component_name(self._component_key)
         if configured:
             return configured
-
-        if measured := _measurement_name(self.device_status, self._component_key):
-            return measured
-
         return "BLU TRV" if self._display_index == 1 else f"BLU TRV {self._display_index}"
 
     def _component(self) -> dict[str, Any]:
