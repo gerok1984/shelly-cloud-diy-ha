@@ -90,7 +90,7 @@ _RATE_LIMIT_BACKOFF_S = 1.5
 # Virtual-component status/config keys look like ``number:200`` / ``boolean:201``.
 # Only these are kept from the v2 ``settings`` block; switch/script/sys/etc. are
 # dropped so the cached config stays small. (#9)
-_VIRTUAL_COMPONENT_KEY_RE = re.compile(r"^(number|enum|text|boolean|blutrv):\d+$")
+_VIRTUAL_COMPONENT_KEY_RE = re.compile(r"^(number|enum|text|boolean):\d+$")
 
 # Irrigation controllers (FRANKEVER FK-06X and friends) expose their zones as
 # virtual booleans, but the zone name the user typed lives in the device's
@@ -455,7 +455,7 @@ class ShellyCloudControl:
         the config the cloud status omits: the user-set ``name``, the number
         ``meta.ui.unit``, and the enum ``options`` / ``meta.ui.titles``.
 
-        Only virtual-component keys (including ``blutrv:<id>``) and the ``service:<n>`` block are kept;
+        Only virtual-component keys and the ``service:<n>`` block are kept;
         every other settings key (``switch:0``, ``script:1``, ``sys``, …) is
         dropped to keep the cached config small. ``service:<n>`` earns its
         place because irrigation controllers store their per-zone names there
