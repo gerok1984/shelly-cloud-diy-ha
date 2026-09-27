@@ -16,7 +16,7 @@ from .const import DOMAIN, SIGNAL_DEVICE_REMOVED
 from .coordinator import ShellyCloudCoordinator, SIGNAL_NEW_DEVICE
 from .entities.base import ShellyBaseEntity
 
-_BLUTRV_KEY_RE = re.compile(r"^blutrv:(\\d+)$")
+_BLUTRV_KEY_RE = re.compile(r"^blutrv:(\d+)$")
 
 def _measurement_name(status: dict[str, Any], component_key: str) -> str | None:
     """Resolve a BLU TRV name from the gateway measurement list.
