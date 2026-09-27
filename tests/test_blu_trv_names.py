@@ -95,7 +95,7 @@ def test_name_falls_back_when_measurements_are_missing() -> None:
 def test_measurement_name_ignores_other_types_and_blank_names() -> None:
     status = {
         "_measurements": [
-            {"name": "Wrong", "value": "blutrv_rstatus:200", "type": "temperature"},
+            {\n                "name": "Wrong",\n                "value": "blutrv_rstatus:200",\n                "type": "temperature",\n            },
             {"name": "   ", "value": "blutrv_rstatus:200", "type": "trv"},
         ]
     }
