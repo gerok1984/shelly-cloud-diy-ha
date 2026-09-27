@@ -91,7 +91,7 @@ _V2_NAME_LOOKUP_GAP_S = 1.2
 # Status/config keys of Gen2/Gen3 virtual components (``number:200``, …). Used
 # to decide which online devices need a one-time v2 config fetch so their
 # read-only virtual entities can render real names/units/options. (#9)
-_VIRTUAL_COMPONENT_KEY_RE = re.compile(r"^(number|enum|text|boolean|blutrv):\d+$")
+_VIRTUAL_COMPONENT_KEY_RE = re.compile(r"^(number|enum|text|boolean):\d+$")
 
 # The only component this integration can WRITE over the cloud relay. Kept
 # separate from the read-only set above: everything there is rendered, only
@@ -393,6 +393,11 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         # new devices appear; we never re-fetch already-known names (they
         # change rarely and cost rate-limit budget).
         self.device_names: dict[str, str] = {}
+        # Full account-wide alias map returned by /interface/device/list.
+        # This includes gateway-bridged BLE children, whose aliases are useful
+        # for naming BLU TRV entities even though the children are not top-level
+        # coordinator devices of their own.
+        self.account_device_names: dict[str, str] = {}
         # Ids covered by a completed name lookup, including those the account
         # has no alias for — keeps a never-renamed device from re-triggering
         # the lookup on every poll. (#13)
@@ -1205,7 +1210,9 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         """
         try:
             await asyncio.sleep(_V2_NAME_LOOKUP_GAP_S)
-            names = await self._api.get_device_names(ids)
+            all_names = await self._api.get_device_names()
+            self.account_device_names = dict(all_names)
+            names = {did: all_names[did] for did in ids if did in all_names}
         except ShellyCloudAuthError:
             _LOGGER.debug("Device name lookup rejected auth_key — skipping")
             return
