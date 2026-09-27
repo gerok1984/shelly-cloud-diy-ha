@@ -393,11 +393,6 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         # new devices appear; we never re-fetch already-known names (they
         # change rarely and cost rate-limit budget).
         self.device_names: dict[str, str] = {}
-        # Full account-wide alias map returned by /interface/device/list.
-        # This includes gateway-bridged BLE children, whose aliases are useful
-        # for naming BLU TRV entities even though the children are not top-level
-        # coordinator devices of their own.
-        self.account_device_names: dict[str, str] = {}
         # Ids covered by a completed name lookup, including those the account
         # has no alias for — keeps a never-renamed device from re-triggering
         # the lookup on every poll. (#13)
@@ -1210,9 +1205,7 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         """
         try:
             await asyncio.sleep(_V2_NAME_LOOKUP_GAP_S)
-            all_names = await self._api.get_device_names()
-            self.account_device_names = dict(all_names)
-            names = {did: all_names[did] for did in ids if did in all_names}
+            names = await self._api.get_device_names(ids)
         except ShellyCloudAuthError:
             _LOGGER.debug("Device name lookup rejected auth_key — skipping")
             return
