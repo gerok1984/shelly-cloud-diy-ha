@@ -88,12 +88,10 @@ from .repair_issues import (
 # stay under the 1 req/s per-account rate limit that both endpoints share.
 _V2_NAME_LOOKUP_GAP_S = 1.2
 
-# Status/config keys that need the v2 settings lookup. Besides ordinary
-# virtual components, BLU Gateway Gen3 exposes ``blutrv:<id>`` and linked
-# ``bthomedevice:<id>`` settings that may carry the user-facing valve alias. Used
+# Status/config keys of Gen2/Gen3 virtual components (``number:200``, …). Used
 # to decide which online devices need a one-time v2 config fetch so their
 # read-only virtual entities can render real names/units/options. (#9)
-_VIRTUAL_COMPONENT_KEY_RE = re.compile(r"^(number|enum|text|boolean|blutrv|bthomedevice):\d+$")
+_VIRTUAL_COMPONENT_KEY_RE = re.compile(r"^(number|enum|text|boolean):\d+$")
 
 # The only component this integration can WRITE over the cloud relay. Kept
 # separate from the read-only set above: everything there is rendered, only
