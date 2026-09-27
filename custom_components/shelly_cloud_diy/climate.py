@@ -19,21 +19,6 @@ from .entities.base import ShellyBaseEntity
 _BLUTRV_KEY_RE = re.compile(r"^blutrv:(\d+)$")
 
 
-def _linked_bthome_name(
-    entity: ShellyBaseEntity, component_key: str
-) -> str | None:
-    """Resolve a BLU TRV name through its linked BTHome device config."""
-    config = entity.virtual_component_config(component_key)
-    if not isinstance(config, dict):
-        return None
-
-    linked = config.get("trv")
-    if not isinstance(linked, str) or not linked.startswith("bthomedevice:"):
-        return None
-
-    return entity.virtual_component_name(linked)
-
-
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -128,14 +113,10 @@ class ShellyBluTrvClimate(ShellyBaseEntity, ClimateEntity):
 
     @property
     def name(self) -> str:
-        """Return the configured or linked BTHome name, then a stable fallback."""
+        """Return the configured component name, or a stable fallback."""
         configured = self.virtual_component_name(self._component_key)
         if configured:
             return configured
-
-        if linked := _linked_bthome_name(self, self._component_key):
-            return linked
-
         return "BLU TRV" if self._display_index == 1 else f"BLU TRV {self._display_index}"
 
     def _component(self) -> dict[str, Any]:
