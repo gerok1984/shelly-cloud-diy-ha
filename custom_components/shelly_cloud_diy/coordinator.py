@@ -392,6 +392,10 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         # new devices appear; we never re-fetch already-known names (they
         # change rarely and cost rate-limit budget).
         self.device_names: dict[str, str] = {}
+        # Gateway id -> blutrv:<id> -> Shelly-app alias. Shelly Cloud exposes
+        # BLU TRVs in /interface/device/list as gateway-child SBTR-001AEU
+        # records carrying both `name` and BLE `addr`.
+        self.blu_trv_names: dict[str, dict[str, str]] = {}
         # Ids covered by a completed name lookup, including those the account
         # has no alias for — keeps a never-renamed device from re-triggering
         # the lookup on every poll. (#13)
@@ -1204,7 +1208,59 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         """
         try:
             await asyncio.sleep(_V2_NAME_LOOKUP_GAP_S)
-            names = await self._api.get_device_names(ids)
+            records = await self._api.get_device_list_records()
+            names: dict[str, str] = {}
+            for did in ids:
+                record = records.get(did)
+                if not isinstance(record, dict):
+                    continue
+                name = record.get("name")
+                if isinstance(name, str) and name.strip():
+                    names[did] = name.strip()
+
+            def _normalise_ble_id(value: object) -> str | None:
+                if not isinstance(value, str):
+                    return None
+                compact = "".join(
+                    ch for ch in value.lower() if ch in "0123456789abcdef"
+                )
+                return compact[-12:] if len(compact) >= 12 else None
+
+            child_aliases: dict[str, dict[str, str]] = {}
+            for did in ids:
+                status = self.devices.get(did, {}).get("status", {})
+                if not isinstance(status, dict):
+                    continue
+                per_gateway: dict[str, str] = {}
+                for key, value in status.items():
+                    if not (
+                        isinstance(key, str)
+                        and key.startswith("blutrv_rinfo:")
+                        and isinstance(value, dict)
+                    ):
+                        continue
+                    info = value.get("device_info")
+                    if not isinstance(info, dict):
+                        continue
+                    wanted = _normalise_ble_id(info.get("mac")) or _normalise_ble_id(
+                        info.get("id")
+                    )
+                    if wanted is None:
+                        continue
+                    component_id = key.split(":", 1)[1]
+                    for child in records.values():
+                        if not isinstance(child, dict):
+                            continue
+                        if child.get("type") != "SBTR-001AEU":
+                            continue
+                        if _normalise_ble_id(child.get("addr")) != wanted:
+                            continue
+                        alias = child.get("name")
+                        if isinstance(alias, str) and alias.strip():
+                            per_gateway[f"blutrv:{component_id}"] = alias.strip()
+                            break
+                if per_gateway:
+                    child_aliases[did] = per_gateway
         except ShellyCloudAuthError:
             _LOGGER.debug("Device name lookup rejected auth_key — skipping")
             return
@@ -1216,15 +1272,17 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
         self._names_attempted.update(ids)
 
-        if not names:
-            return
-
         self.device_names.update(names)
+        self.blu_trv_names.update(child_aliases)
         for did, name in names.items():
             entry = self.devices.get(did)
             if entry is not None:
                 entry["name"] = name
-        _LOGGER.info("Resolved %d device name(s) from the cloud alias list", len(names))
+        _LOGGER.info(
+            "Resolved %d device name(s) and %d BLU TRV alias(es) from the cloud alias list",
+            len(names),
+            sum(len(v) for v in child_aliases.values()),
+        )
 
         # Push the resolved names into the HA device registry so existing
         # DeviceEntry rows (created at integration setup with a fallback
