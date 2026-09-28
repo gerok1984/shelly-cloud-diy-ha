@@ -93,7 +93,7 @@ _V2_NAME_LOOKUP_GAP_S = 1.2
 # ``bthomedevice:<id>`` settings that may carry the user-facing valve alias. Used
 # to decide which online devices need a one-time v2 config fetch so their
 # read-only virtual entities can render real names/units/options. (#9)
-_VIRTUAL_COMPONENT_KEY_RE = re.compile(r"^(number|enum|text|boolean|blutrv|bthomedevice):\d+$")
+_VIRTUAL_COMPONENT_KEY_RE = re.compile(r"^(number|enum|text|boolean):\d+$")
 
 # The only component this integration can WRITE over the cloud relay. Kept
 # separate from the read-only set above: everything there is rendered, only
@@ -395,6 +395,10 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         # new devices appear; we never re-fetch already-known names (they
         # change rarely and cost rate-limit budget).
         self.device_names: dict[str, str] = {}
+        # Gateway device id -> blutrv:<id> -> Shelly-App alias. BLU TRVs
+        # appear in /interface/device/list as gateway child records (for
+        # example <gateway>_2200) with their own `name` and BLE `addr`.
+        self.blu_trv_names: dict[str, dict[str, str]] = {}
         # Ids covered by a completed name lookup, including those the account
         # has no alias for — keeps a never-renamed device from re-triggering
         # the lookup on every poll. (#13)
@@ -1207,7 +1211,57 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         """
         try:
             await asyncio.sleep(_V2_NAME_LOOKUP_GAP_S)
-            names = await self._api.get_device_names(ids)
+            records = await self._api.get_device_list_records()
+            names: dict[str, str] = {}
+            for did in ids:
+                rec = records.get(did)
+                if not isinstance(rec, dict):
+                    continue
+                name = rec.get("name")
+                if isinstance(name, str) and name.strip():
+                    names[did] = name.strip()
+
+            def _norm_ble(value: object) -> str | None:
+                if not isinstance(value, str):
+                    return None
+                compact = "".join(
+                    ch for ch in value.lower() if ch in "0123456789abcdef"
+                )
+                return compact[-12:] if len(compact) >= 12 else None
+
+            child_names: dict[str, dict[str, str]] = {}
+            for did in ids:
+                status = self.devices.get(did, {}).get("status", {})
+                if not isinstance(status, dict):
+                    continue
+                per_gateway: dict[str, str] = {}
+                for key, value in status.items():
+                    if not (
+                        isinstance(key, str)
+                        and key.startswith("blutrv_rinfo:")
+                        and isinstance(value, dict)
+                    ):
+                        continue
+                    info = value.get("device_info")
+                    if not isinstance(info, dict):
+                        continue
+                    wanted = _norm_ble(info.get("mac")) or _norm_ble(info.get("id"))
+                    if wanted is None:
+                        continue
+                    component_id = key.split(":", 1)[1]
+                    for record in records.values():
+                        if not isinstance(record, dict):
+                            continue
+                        if record.get("type") != "SBTR-001AEU":
+                            continue
+                        if _norm_ble(record.get("addr")) != wanted:
+                            continue
+                        alias = record.get("name")
+                        if isinstance(alias, str) and alias.strip():
+                            per_gateway[f"blutrv:{component_id}"] = alias.strip()
+                            break
+                if per_gateway:
+                    child_names[did] = per_gateway
         except ShellyCloudAuthError:
             _LOGGER.debug("Device name lookup rejected auth_key — skipping")
             return
@@ -1219,15 +1273,17 @@ class ShellyCloudCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
         self._names_attempted.update(ids)
 
-        if not names:
-            return
-
         self.device_names.update(names)
+        self.blu_trv_names.update(child_names)
         for did, name in names.items():
             entry = self.devices.get(did)
             if entry is not None:
                 entry["name"] = name
-        _LOGGER.info("Resolved %d device name(s) from the cloud alias list", len(names))
+        _LOGGER.info(
+            "Resolved %d device name(s) and %d BLU TRV alias set(s) from the cloud alias list",
+            len(names),
+            sum(len(v) for v in child_names.values()),
+        )
 
         # Push the resolved names into the HA device registry so existing
         # DeviceEntry rows (created at integration setup with a fallback
