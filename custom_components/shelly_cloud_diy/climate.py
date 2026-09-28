@@ -148,16 +148,25 @@ class ShellyBluTrvClimate(ShellyBaseEntity, ClimateEntity):
         self._component_key = component_key
         self._attr_unique_id = f"{device_id}_{component_key}_climate"
 
-        # The name the user typed in the Shelly app, if the cloud carries it.
-        # It does not today — the v2 config fetch is scoped to the virtual
-        # components, and no snapshot has yet shown a name on a ``blutrv``
-        # component — so in practice this falls through to the positional
-        # name. Left in place because it costs nothing and is the same hook
-        # every other component name goes through.
-        configured = self.virtual_component_name(component_key)
-        self._attr_name = configured or (
+        # Stable fallback. The real Shelly-app alias is resolved lazily from
+        # /interface/device/list after entity creation, so ``name`` below
+        # reads the coordinator cache dynamically instead of freezing it here.
+        self._attr_name = (
             "BLU TRV" if display_index == 0 else f"BLU TRV {display_index + 1}"
         )
+
+    @property
+    def name(self) -> str:
+        """Return the Shelly-app valve alias when the cloud provides it."""
+        aliases = getattr(self.coordinator, "blu_trv_names", {})
+        gateway_aliases = (
+            aliases.get(self._device_id, {}) if isinstance(aliases, dict) else {}
+        )
+        if isinstance(gateway_aliases, dict):
+            alias = gateway_aliases.get(self._component_key)
+            if isinstance(alias, str) and alias.strip():
+                return alias.strip()
+        return self._attr_name
 
     def _component(self) -> dict[str, Any]:
         value = self.device_status.get(self._component_key)
