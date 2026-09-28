@@ -276,6 +276,106 @@ async def async_get_config_entry_diagnostics(
     }
 
 
+async def _trv_account_device_probe(
+    coordinator: Any, record: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Probe the account device list for standalone records matching BLU TRVs.
+
+    The Gateway Gen3 status gives each valve hardware identity under
+    blutrv_rinfo:<id>.device_info. This diagnostic makes one explicit
+    account-list request and checks whether any standalone cloud-device record
+    contains the same 12-hex hardware identifier. Human-set names stay
+    redacted, but name_present tells us whether an alias exists there.
+    """
+    status = record.get("status")
+    if not isinstance(status, dict):
+        return None
+
+    target_ids: dict[str, str] = {}
+    for key, value in status.items():
+        if not (
+            isinstance(key, str)
+            and key.startswith("blutrv_rinfo:")
+            and isinstance(value, dict)
+        ):
+            continue
+        info = value.get("device_info")
+        if not isinstance(info, dict):
+            continue
+        raw_id = info.get("id")
+        raw_mac = info.get("mac")
+        source = raw_mac if isinstance(raw_mac, str) and raw_mac else raw_id
+        if not isinstance(source, str):
+            continue
+        compact = "".join(ch for ch in source.lower() if ch in "0123456789abcdef")
+        if len(compact) >= 12:
+            target_ids[key.split(":", 1)[1]] = compact[-12:]
+
+    if not target_ids:
+        return {"note": "no BLU TRV hardware ids found in gateway status"}
+
+    api = getattr(coordinator, "_api", None)
+    getter = getattr(api, "get_device_list_records", None)
+    if getter is None:
+        return {"note": "account device-list probe unavailable"}
+
+    try:
+        records = await getter()
+    except Exception as err:  # noqa: BLE001 - diagnostics must survive probe failure
+        return {"error": f"{type(err).__name__}: {err}"}
+
+    def _flatten_strings(value: Any) -> list[str]:
+        out: list[str] = []
+        if isinstance(value, str):
+            out.append(value)
+        elif isinstance(value, dict):
+            for k, v in value.items():
+                if isinstance(k, str):
+                    out.append(k)
+                out.extend(_flatten_strings(v))
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                out.extend(_flatten_strings(item))
+        return out
+
+    matches: dict[str, list[dict[str, Any]]] = {idx: [] for idx in target_ids}
+    inventory: list[dict[str, Any]] = []
+
+    for did, cloud_record in records.items():
+        name = cloud_record.get("name")
+        summary: dict[str, Any] = {
+            "key": did,
+            "name_present": isinstance(name, str) and bool(name.strip()),
+        }
+        for field in ("id", "code", "gen", "model", "type"):
+            if field in cloud_record:
+                summary[field] = cloud_record.get(field)
+        inventory.append(summary)
+
+        haystack = " ".join(_flatten_strings({"key": did, **cloud_record})).lower()
+        compact_haystack = "".join(
+            ch for ch in haystack if ch in "0123456789abcdef"
+        )
+        for idx, hardware_id in target_ids.items():
+            if hardware_id not in compact_haystack:
+                continue
+            matches[idx].append(
+                {
+                    "key": did,
+                    "name_present": isinstance(name, str) and bool(name.strip()),
+                    "record": async_redact_data(
+                        cloud_record, DEVICE_TO_REDACT
+                    ),
+                }
+            )
+
+    return {
+        "target_hardware_ids": target_ids,
+        "account_record_count": len(records),
+        "matches": matches,
+        "inventory": inventory,
+    }
+
 async def async_get_device_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry, device: DeviceEntry
 ) -> dict[str, Any]:
@@ -319,6 +419,8 @@ async def async_get_device_diagnostics(
             "reporting": _reporting_diagnostics(coordinator, device_id),
         }
 
+    trv_account_probe = await _trv_account_device_probe(coordinator, record)
+
     return {
         "device_id": device_id,
         "coordinator": coordinator_health,
@@ -330,6 +432,7 @@ async def async_get_device_diagnostics(
         "coverage": _coverage_diagnostics(
             coordinator, device_id, record.get("status") or {}
         ),
+        "trv_account_device_probe": trv_account_probe,
         "record": async_redact_data(record, DEVICE_TO_REDACT),
     }
 

@@ -397,6 +397,27 @@ class ShellyCloudControl:
                 names[did] = name.strip()
         return names
 
+    async def get_device_list_records(self) -> dict[str, dict[str, Any]]:
+        """Return raw device records from the account-wide cloud device list.
+
+        This is intentionally a diagnostic/probing primitive. The auth key is
+        consumed by :meth:`_post` and is never part of the returned payload.
+        Callers are responsible for redacting human-set names or other
+        identifying values before exposing the records.
+        """
+        body = await self._post("/interface/device/list")
+        data = body.get("data")
+        if not isinstance(data, dict):
+            return {}
+        devices = data.get("devices")
+        if not isinstance(devices, dict):
+            return {}
+        return {
+            did: dict(record)
+            for did, record in devices.items()
+            if isinstance(did, str) and isinstance(record, dict)
+        }
+
     async def get_account_inventory(self) -> AccountInventory:
         """Fetch the alias-independent device inventory of the account.
 
