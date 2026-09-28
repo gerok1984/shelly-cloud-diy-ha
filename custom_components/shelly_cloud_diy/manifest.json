@@ -5,15 +5,15 @@
     "recorder"
   ],
   "codeowners": [
-    "@notDIRK"
+    "@gerok1984"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/notDIRK/shelly-cloud-diy-ha",
+  "documentation": "https://github.com/gerok1984/shelly-cloud-diy-ha",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/notDIRK/shelly-cloud-diy-ha/issues",
+  "issue_tracker": "https://github.com/gerok1984/shelly-cloud-diy-ha/issues",
   "requirements": [
     "aiohttp>=3.8.0",
     "aioshelly>=13.0.0"
   ],
-  "version": "0.13.0"
+  "version": "0.13.0.1"
 }
