@@ -395,6 +395,27 @@ class ShellyCloudControl:
                 names[did] = name.strip()
         return names
 
+    async def get_device_list_records(self) -> dict[str, dict[str, Any]]:
+        """Return the account-wide cloud device records from one alias-list call.
+
+        BLU TRVs behind a Gateway Gen3 are represented here as gateway-child
+        records (``<gateway_id>_2200`` etc.) with their own Shelly-app ``name``
+        and BLE ``addr``. Returning the records lets the coordinator resolve
+        those aliases without spending an additional API request.
+        """
+        body = await self._post("/interface/device/list")
+        data = body.get("data")
+        if not isinstance(data, dict):
+            return {}
+        devices = data.get("devices")
+        if not isinstance(devices, dict):
+            return {}
+        return {
+            did: dict(record)
+            for did, record in devices.items()
+            if isinstance(did, str) and isinstance(record, dict)
+        }
+
     async def get_account_inventory(self) -> AccountInventory:
         """Fetch the alias-independent device inventory of the account.
 
