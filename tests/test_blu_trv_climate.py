@@ -132,6 +132,7 @@ class _FakeCoordinator:
         self.data = self.devices
         self.last_update_success = True
         self.virtual_configs: dict[str, dict[str, dict]] = {}
+        self.blu_trv_names: dict[str, dict[str, str]] = {}
         self._controllable = controllable
         self.cloud_control_connected = connected
         self._cloud_ws = relay
@@ -163,6 +164,18 @@ def _climates(
 
 # ── 1. The gateway must be recognised at all ──────────────────────────
 
+
+def test_climate_uses_shelly_app_alias_from_account_list_cache() -> None:
+    coordinator, entities = _climates()
+    coordinator.blu_trv_names = {
+        GATEWAY_ID: {
+            "blutrv:200": "Salón 1",
+            "blutrv:201": "Salón 2",
+        }
+    }
+
+    assert entities[0].name == "Salón 1"
+    assert entities[1].name == "Salón 2"
 
 def test_a_gateway_whose_only_rpc_component_is_a_valve_reads_as_gen2() -> None:
     """A BLU Gateway Gen3 has no relay, no light, no meter — only valves.
