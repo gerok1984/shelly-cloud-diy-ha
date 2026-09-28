@@ -2,8 +2,24 @@
 
 <img src="https://raw.githubusercontent.com/notDIRK/shelly-cloud-diy-ha/main/images/icon.png" alt="Shelly Cloud DIY" width="128">
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
-[![GitHub Release](https://img.shields.io/github/v/release/notDIRK/shelly-cloud-diy-ha)](https://github.com/notDIRK/shelly-cloud-diy-ha/releases)
+[![Fork](https://img.shields.io/badge/fork-gerok1984-6f42c1.svg)](https://github.com/gerok1984/shelly-cloud-diy-ha)
+[![Version](https://img.shields.io/badge/version-0.13.0.1-orange.svg)](https://github.com/gerok1984/shelly-cloud-diy-ha)
+[![Upstream](https://img.shields.io/badge/upstream-notDIRK%2Fshelly--cloud--diy--ha-blue.svg)](https://github.com/notDIRK/shelly-cloud-diy-ha)
+
+> **Fork maintained by [@gerok1984](https://github.com/gerok1984).**  
+> Based on upstream **v0.13.0** from [notDIRK/shelly-cloud-diy-ha](https://github.com/notDIRK/shelly-cloud-diy-ha).
+
+## Changes in this fork
+
+- **Real Shelly-app names for BLU TRVs** behind a BLU Gateway Gen3.
+- Resolves each valve from `/interface/device/list` using the real `SBTR-001AEU` child record and matches it by BLE `addr`.
+- Reuses the existing account device-list request, so TRV naming adds **no extra v2 API request**.
+- Verified on real hardware with two BLU TRVs; Home Assistant correctly shows the Shelly aliases **“Salón 1”** and **“Salón 2”**.
+- HACS source install enabled for this fork (`zip_release: false`).
+
+Everything else is inherited from upstream **v0.13.0** unless explicitly listed above.
+
+---
 
 > 🇩🇪 **Deutsch** · 🇬🇧 **English (you are here)** — [`README.de.md`](README.de.md) is the German mirror of this page.
 
